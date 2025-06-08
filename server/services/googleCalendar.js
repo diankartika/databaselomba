@@ -1,32 +1,44 @@
 const { google } = require("googleapis");
-const readline = require("readline");
-require("dotenv").config();
 
-const oAuth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  "urn:ietf:wg:oauth:2.0:oob" // redirect manual
-);
+function authorizeGoogle() {
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = process.env;
 
-const authUrl = oAuth2Client.generateAuthUrl({
-  access_type: "offline",
-  prompt: "consent",
-  scope: ["https://www.googleapis.com/auth/calendar"],
-});
+  const oAuth2Client = new google.auth.OAuth2(
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET
+  );
 
-console.log("🌐 Buka URL berikut dan paste kodenya di bawah:\n", authUrl);
+  oAuth2Client.setCredentials({ refresh_token: GOOGLE_REFRESH_TOKEN });
+  return oAuth2Client;
+}
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
+async function createEvent(data) {
+  const auth = authorizeGoogle();
+  const calendar = google.calendar({ version: "v3", auth });
 
-rl.question("📥 Masukkan kode: ", async (code) => {
-  try {
-    const { tokens } = await oAuth2Client.getToken(code);
-    console.log("✅ REFRESH TOKEN:", tokens.refresh_token);
-  } catch (err) {
-    console.error("❌ ERROR:", err.response?.data || err.message);
-  }
-  rl.close();
-});
+  const startDateTime = new Date(data.deadline);
+  const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 jam kemudian
+
+  const event = {
+    summary: data.title,
+    description: data.description,
+    location: data.location,
+    start: {
+      dateTime: startDateTime.toISOString(),  // ⬅ ISO UTC
+      timeZone: "Asia/Jakarta",               // ⬅ Google akan konversi ini
+    },
+    end: {
+      dateTime: endDateTime.toISOString(),
+      timeZone: "Asia/Jakarta",
+    },
+  };
+
+  const response = await calendar.events.insert({
+    calendarId: process.env.GOOGLE_CALENDAR_ID,
+    requestBody: event,
+  });
+
+  return response.data.id;
+}
+
+module.exports = { createEvent };

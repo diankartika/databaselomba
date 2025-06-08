@@ -1,7 +1,8 @@
+require('dotenv').config();
 const express = require("express");
 const router = express.Router();
 const Lomba = require("../models/Lomba");
-const { createEvent } = require("../services/googleCalendar");
+const { createEvent } = require("../services/googleCalendar"); // atau "./googleCalendar" tergantung path
 
 router.post("/", async (req, res) => {
   try {
