@@ -1,42 +1,32 @@
 const { google } = require("googleapis");
+const readline = require("readline");
 require("dotenv").config();
 
 const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET
+  process.env.GOOGLE_CLIENT_SECRET,
+  "urn:ietf:wg:oauth:2.0:oob" // redirect manual
 );
 
-// Set credentials from saved refresh token
-oAuth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+const authUrl = oAuth2Client.generateAuthUrl({
+  access_type: "offline",
+  prompt: "consent",
+  scope: ["https://www.googleapis.com/auth/calendar"],
 });
 
-const calendar = google.calendar({ version: "v3", auth: oAuth2Client });
+console.log("🌐 Buka URL berikut dan paste kodenya di bawah:\n", authUrl);
 
-async function createEvent(lomba) {
-  const event = {
-    summary: lomba.title,
-    description: lomba.notes || "",
-    start: {
-      dateTime: new Date(lomba.deadline).toISOString(),
-      timeZone: "Asia/Jakarta",
-    },
-    end: {
-      dateTime: new Date(new Date(lomba.deadline).getTime() + 3600000).toISOString(), // +1 jam
-      timeZone: "Asia/Jakarta",
-    },
-  };
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 
+rl.question("📥 Masukkan kode: ", async (code) => {
   try {
-    const response = await calendar.events.insert({
-      calendarId: process.env.GOOGLE_CALENDAR_ID || "primary",
-      resource: event,
-    });
-    return response.data.id; // eventId
-  } catch (error) {
-    console.error("Failed to create calendar event:", error.message);
-    return null;
+    const { tokens } = await oAuth2Client.getToken(code);
+    console.log("✅ REFRESH TOKEN:", tokens.refresh_token);
+  } catch (err) {
+    console.error("❌ ERROR:", err.response?.data || err.message);
   }
-}
-
-module.exports = { createEvent };
+  rl.close();
+});
